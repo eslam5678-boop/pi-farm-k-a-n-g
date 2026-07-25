@@ -265,178 +265,106 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-          console.log("[PiAuth] No parent credentials, attempting Pi SDK");
-          setAuthMessage("Loading Pi SDK...");
-          await loadPiSDK();
-          setAuthMessage("Initializing Pi Network...");
-          
-          console.log("[PiAuth] Pi.init() config:", {
-            version: "2.0",
-            sandbox: PI_NETWORK_CONFIG.SANDBOX,
-            appId: PI_NETWORK_CONFIG.APP_ID,
-            origin: typeof window !== "undefined" ? window.location.origin : "server",
-            piAppId: typeof window !== "undefined" ? window.Pi?.getAppId?.() : "N/A",
-          });
-          
-          await window.Pi.init({
-            version: "2.0",
-            sandbox: PI_NETWORK_CONFIG.SANDBOX,
-            appId: PI_NETWORK_CONFIG.APP_ID,
-          });
+      console.log("[PiAuth] No parent credentials, attempting Pi SDK");
+      setAuthMessage("Loading Pi SDK...");
+      await loadPiSDK();
+      setAuthMessage("Initializing Pi Network...");
+      
+      await window.Pi.init({
+        version: "2.0",
+        sandbox: PI_NETWORK_CONFIG.SANDBOX,
+        appId: PI_NETWORK_CONFIG.APP_ID,
+      });
 
-          console.log("[PiAuth] Pi.init() succeeded, current appId:", 
-            typeof window !== "undefined" ? window.Pi?.getAppId?.() : "N/A");
+      setAuthMessage("Loading SDKLite...");
+      await loadSDKLite();
 
-          setAuthMessage("Loading SDKLite...");
-          await loadSDKLite();
+      setAuthMessage("Initializing SDKLite...");
+      const sdkInstance = await window.SDKLite.init();
+      
+      setAuthMessage("Authenticating with Pi Network...");
+      const success = await sdkInstance.login();
+      
+      if (!success) {
+        throw new Error("Pi Network login failed");
+      }
 
-          setAuthMessage("Initializing SDKLite...");
-          const sdkInstance = await window.SDKLite.init();
-          
-          setAuthMessage("Authenticating with Pi Network...");
-          console.log("[PiAuth] About to call sdkInstance.login() with scopes:", ["username"]);
-          
-          const success = await sdkInstance.login();
-          
-          console.log("[PiAuth] sdkInstance.login() result:", success);
-          
-          if (!success) {
-            const error = new Error("Pi Network login failed - check App ID and Callback URL in Developer Portal");
-            console.error("[PiAuth] Login failed:", {
-              success,
-              appId: PI_NETWORK_CONFIG.APP_ID,
-              expectedOrigin: window.location.origin,
-              pi_getAppId: window.Pi?.getAppId?.(),
-            });
-            throw error;
-          }
-
-          setSdk(sdkInstance);
-          setIsAuthenticated(true);
-          
-          console.log("[PiAuth] Authentication successful:", {
-            appId: PI_NETWORK_CONFIG.APP_ID,
-            origin: window.location.origin,
-            pi_getAppId: typeof window.Pi?.getAppId === 'function' ? window.Pi.getAppId() : "N/A",
-            url: window.location.href,
-          });
-          
-          try {
-            if (window.Pi && typeof window.Pi.user?.getMe === 'function') {
-              const userInfo = await (window.Pi.user as any).getMe();
-              if (userInfo && userInfo.username) {
-                setUser({
-                  username: userInfo.username,
-                  id: userInfo.uid || "pi-user-" + Math.random().toString(36).slice(2, 9)
-                });
-              }
-            }
-          } catch (userInfoError) {
-            console.error("[PiAuth] Failed to get user info:", userInfoError);
+      setSdk(sdkInstance);
+      setIsAuthenticated(true);
+      
+      try {
+        if (window.Pi && typeof window.Pi.user?.getMe === 'function') {
+          const userInfo = await (window.Pi.user as any).getMe();
+          if (userInfo && userInfo.username) {
             setUser({
-              username: "مستخدم Pi",
-              id: "pi-user-" + Math.random().toString(36).slice(2, 9)
+              username: userInfo.username,
+              id: userInfo.uid || "pi-user-" + Math.random().toString(36).slice(2, 9)
             });
           }
-          
-          await fetchProducts(sdkInstance);
-
-          try {
-            const { purchases } = await sdkInstance.state.restore();
-            setRestoredPurchases(purchases);
-            console.log("[PiAuth] Purchases restored", purchases);
-          } catch (e) {
-            console.error("[PiAuth] Failed to restore purchases:", e);
-            setRestoredPurchases([]);
-          }
-        } catch (err) {
-          console.error("[PiAuth] SDKLite initialization failed:", err);
-          
-          const errorDetails = {
-            appId: PI_NETWORK_CONFIG.APP_ID,
-            origin: typeof window !== "undefined" ? window.location.origin : "N/A",
-            sandbox: PI_NETWORK_CONFIG.SANDBOX,
-            callbackUrl: PI_NETWORK_CONFIG.CALLBACK_URL,
-            piAvailable: typeof window !== "undefined" && !!window.Pi,
-            sdkLiteAvailable: typeof window !== "undefined" && !!window.SDKLite,
-            errorType: err instanceof Error ? err.name : typeof err,
-            errorMessage: err instanceof Error ? err.message : String(err),
-            errorStack: err instanceof Error ? err.stack : "N/A",
-            pi_getAppId: typeof window !== "undefined" && window.Pi?.getAppId ? window.Pi.getAppId() : "N/A",
-          };
-          
-          console.error("[PiAuth] Full Error Debug Info:", errorDetails);
-          
-          if (err instanceof Error) {
-            const errorMsg = err.message.toLowerCase();
-            if (errorMsg.includes("app id") || errorMsg.includes("unauthorized")) {
-              console.error("[PiAuth] ERROR LIKELY CAUSE: Invalid App ID. Check Developer Portal and update in system-config.ts");
-            } else if (errorMsg.includes("callback") || errorMsg.includes("origin")) {
-              console.error("[PiAuth] ERROR LIKELY CAUSE: Callback URL/Origin mismatch. Verify in Developer Portal that origin matches:", window.location.origin);
-            } else if (errorMsg.includes("cors") || errorMsg.includes("cross-origin")) {
-              console.error("[PiAuth] ERROR LIKELY CAUSE: CORS issue. Check if sandbox mode is enabled (SANDBOX: true)");
-            }
-          }
-
-          if (PI_NETWORK_CONFIG.ENABLE_MOCK_MODE) {
-            console.warn("[PiAuth] Enabling Mock Mode - game will run with demo data");
-            setIsAuthenticated(true);
-            setAuthMessage("Running in Mock Mode (Demo)");
-            setUser({
-              username: "Demo User",
-              id: "mock-user-demo",
-            });
-            return;
-          }
-
-          setHasError(true);
-          setAuthMessage(
-            err instanceof Error
-              ? err.message
-              : "Authentication failed. Please try again.",
-          );
         }
-      };
-
-      useEffect(() => {
-        console.log("[PiAuth] Provider mounted - initializing in background");
-        
-        const initPromise = initialize();
-        
-        const timeout = setTimeout(() => {
-          console.log("[PiAuth] Auth initialization timeout (30s) - continuing with guest mode");
-        }, 30000);
-        
-        initPromise.finally(() => {
-          clearTimeout(timeout);
-          console.log("[PiAuth] Auth initialization completed");
+      } catch (userInfoError) {
+        setUser({
+          username: "مستخدم Pi",
+          id: "pi-user-" + Math.random().toString(36).slice(2, 9)
         });
-      }, []);
+      }
+      
+      await fetchProducts(sdkInstance);
 
-      const value: PiAuthContextType = {
-        isAuthenticated,
-        authMessage,
-        hasError,
-        sdk,
-        products,
-        restoredPurchases,
-        reinitialize: initialize,
-        isLoading,
-        user: user || {
-          username: "مرحبا بك",
-          id: "guest-" + Math.random().toString(36).slice(2, 9)
-        },
-      };
+      try {
+        const { purchases } = await sdkInstance.state.restore();
+        setRestoredPurchases(purchases);
+      } catch (e) {
+        setRestoredPurchases([]);
+      }
+    } catch (err) {
+      if (PI_NETWORK_CONFIG.ENABLE_MOCK_MODE) {
+        setIsAuthenticated(true);
+        setAuthMessage("Running in Mock Mode (Demo)");
+        setUser({
+          username: "Demo User",
+          id: "mock-user-demo",
+        });
+        return;
+      }
 
-      return (
-        <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>
+      setHasError(true);
+      setAuthMessage(
+        err instanceof Error
+          ? err.message
+          : "Authentication failed. Please try again."
       );
     }
+  };
 
-    export function usePiAuth() {
-      const context = useContext(PiAuthContext);
-      if (context === undefined) {
-        throw new Error("usePiAuth must be used within a PiAuthProvider");
-      }
-      return context;
-    }
+  useEffect(() => {
+    initialize();
+  }, []);
+
+  const value: PiAuthContextType = {
+    isAuthenticated,
+    authMessage,
+    hasError,
+    sdk,
+    products,
+    restoredPurchases,
+    reinitialize: initialize,
+    isLoading,
+    user: user || {
+      username: "مرحبا بك",
+      id: "guest-" + Math.random().toString(36).slice(2, 9)
+    },
+  };
+
+  return (
+    <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>
+  );
+}
+
+export function usePiAuth() {
+  const context = useContext(PiAuthContext);
+  if (context === undefined) {
+    throw new Error("usePiAuth must be used within a PiAuthProvider");
+  }
+  return context;
+}
