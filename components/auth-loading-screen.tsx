@@ -1,6 +1,6 @@
 "use client";
 
-import { usePiAuth } from "../contexts/pi-auth-context";
+import { PiAuthContext } from "../contexts/pi-auth-context";
 
 export function AuthLoadingScreen() {
   const { authMessage, hasError, reinitialize, isLoading } = usePiAuth();
