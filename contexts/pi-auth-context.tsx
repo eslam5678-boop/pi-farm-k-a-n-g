@@ -30,8 +30,6 @@ function isInIframe(): boolean {
     if (error instanceof Error && /Permission denied/i.test(error.message)) {
       return true;
     }
-
-    console.error("[v0] Error checking iframe status:", error);
     return false;
   }
 }
@@ -42,13 +40,11 @@ function parseJsonSafely(value: any): any {
       try {
         return JSON.parse(value);
       } catch (parseError) {
-        console.error("[v0] Error parsing JSON:", parseError);
         return null;
       }
     }
     return typeof value === 'object' && value !== null ? value : null;
   } catch (error) {
-    console.error("[v0] Error in parseJsonSafely:", error);
     return null;
   }
 }
@@ -72,9 +68,7 @@ function requestParentCredentials(): Promise<{ accessToken: string; appId: strin
             if (timeoutId !== null) {
               clearTimeout(timeoutId);
             }
-          } catch (cleanupError) {
-            console.error("[v0] Error in cleanup:", cleanupError);
-          }
+          } catch (cleanupError) {}
         };
 
         const messageListener = (event: MessageEvent) => {
@@ -96,20 +90,14 @@ function requestParentCredentials(): Promise<{ accessToken: string; appId: strin
 
             resolve(accessToken ? { accessToken, appId } : null);
           } catch (listenerError) {
-            console.error("[v0] Error in messageListener:", listenerError);
             cleanup(messageListener);
             resolve(null);
           }
         };
 
         timeoutId = setTimeout(() => {
-          try {
-            cleanup(messageListener);
-            resolve(null);
-          } catch (timeoutError) {
-            console.error("[v0] Error in timeout handler:", timeoutError);
-            resolve(null);
-          }
+          cleanup(messageListener);
+          resolve(null);
         }, timeoutMs);
 
         window.addEventListener('message', messageListener);
@@ -122,12 +110,10 @@ function requestParentCredentials(): Promise<{ accessToken: string; appId: strin
           '*'
         );
       } catch (err) {
-        console.error("[v0] Error in promise setup:", err);
         resolve(null);
       }
     });
   } catch (e) {
-    console.error("[v0] Error in requestParentCredentials:", e);
     return Promise.resolve(null);
   }
 }
@@ -165,15 +151,8 @@ const loadPiSDK = (): Promise<void> => {
     script.src = PI_NETWORK_CONFIG.SDK_URL;
     script.async = true;
 
-    script.onload = () => {
-      console.log("Pi SDK script loaded successfully");
-      resolve();
-    };
-
-    script.onerror = () => {
-      console.error("Failed to load Pi SDK script");
-      reject(new Error("Failed to load Pi SDK script"));
-    };
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Pi SDK script"));
 
     document.head.appendChild(script);
   });
@@ -198,15 +177,8 @@ const loadSDKLite = (): Promise<void> => {
     script.src = PI_NETWORK_CONFIG.SDK_LITE_URL;
     script.async = true;
 
-    script.onload = () => {
-      console.log("SDKLite script loaded successfully");
-      resolve();
-    };
-
-    script.onerror = () => {
-      console.error("Failed to load SDKLite script");
-      reject(new Error("Failed to load SDKLite script"));
-    };
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load SDKLite script"));
 
     document.head.appendChild(script);
   });
@@ -218,10 +190,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [hasError, setHasError] = useState(false);
   const [sdk, setSdk] = useState<SDKLiteInstance | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
-  const [restoredPurchases, setRestoredPurchases] = useState<
-    UserPurchaseBalance[] | null
-  >(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [restoredPurchases, setRestoredPurchases] = useState<UserPurchaseBalance[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<{ username: string; id: string } | null>(null);
 
   const isDevelopmentMode = typeof window !== 'undefined' && (window as any).__DEV_MODE__ === true;
@@ -231,41 +201,38 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       const { products } = await sdkInstance.state.products();
       setProducts(products);
     } catch (e) {
-      console.error("Failed to load products:", e);
       setProducts([]);
     }
   };
 
   const initialize = async () => {
-    console.log("[PiAuth] Initialize called");
     setHasError(false);
     setRestoredPurchases(null);
+    setIsLoading(true);
     
     if (isDevelopmentMode) {
-      console.log("[PiAuth] Development mode detected - setting dev user");
       setIsAuthenticated(true);
       setAuthMessage("Development mode - authenticated");
       setUser({
         username: "مطور",
         id: "dev-user-12345"
       });
+      setIsLoading(false);
       return;
     }
     
     try {
-      console.log("[PiAuth] Probing for parent credentials");
       const parentCredentials = await requestParentCredentials();
       if (parentCredentials) {
-        console.log("[PiAuth] Parent credentials found");
         setIsAuthenticated(true);
         setUser({
           username: "مستخدم App Studio",
           id: parentCredentials.appId || "app-studio-user"
         });
+        setIsLoading(false);
         return;
       }
 
-      console.log("[PiAuth] No parent credentials, attempting Pi SDK");
       setAuthMessage("Loading Pi SDK...");
       await loadPiSDK();
       setAuthMessage("Initializing Pi Network...");
@@ -325,6 +292,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           username: "Demo User",
           id: "mock-user-demo",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -334,6 +302,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           ? err.message
           : "Authentication failed. Please try again."
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
