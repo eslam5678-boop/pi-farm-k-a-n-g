@@ -1,4 +1,19 @@
 "use client";
+import { useEffect, useState } from "react";
+
+export default function AppWrapper({ children }: { children: React.ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null; // أو شاشة تحميل بسيطة
+  }
+
+  return <>{children}</>;
+}
 
 import { useEffect, type ReactNode } from "react";
 import { PiAuthContext } from "../contexts/pi-auth-context";
