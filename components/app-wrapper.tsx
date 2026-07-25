@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { PiAuthProvider, usePiAuth } from "@/contexts/pi-auth-context";
+import { PiAuthProvider, usePiAuth } from "../contexts/pi-auth-context";
 import { AuthLoadingScreen } from "./auth-loading-screen";
 
 // Enable development mode - set to false in production
