@@ -1,5 +1,5 @@
 "use client";
-
+export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from 'react';
 import FarmGrid from '../components/farm/farm_grid';
 import { GAME_ASSETS, LAND_CONTRACTS } from '../lib/gameData';
