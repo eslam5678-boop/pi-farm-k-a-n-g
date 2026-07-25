@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { PiAuthProvider, usePiAuth } from "../contexts/pi-auth-context";
 import { AuthLoadingScreen } from "./auth-loading-screen";
-export function AppWrapper({ children }: { children: ReactNode }) 
+
 // Enable development mode - set to false in production
 const ENABLE_DEV_MODE = true;
 
@@ -19,7 +19,7 @@ function AppContent({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export default function AppWrapper({ children }: { children: ReactNode }) {
+export function AppWrapper({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
